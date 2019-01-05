@@ -6,7 +6,7 @@ st.so: st.c
 	env PYMODNAME=st PYMODCFLAGS="" PYMODLIBS="-lfftw3" $(MAKE) -f $(CONFDIR)/Makefile.pymod
 
 stomp.so: stomp.c
-	env PYMODNAME=stomp PYMODCFLAGS="" PYMODLIBS="-lfftw3 -fopenmp" $(MAKE) -f $(CONFDIR)/Makefile.pymod
+	env PYMODNAME=stomp PYMODCFLAGS="-fopenmp" PYMODLIBS="-lfftw3" $(MAKE) -f $(CONFDIR)/Makefile.pymod
 
 DEST = $(LIBDIR)/st
 

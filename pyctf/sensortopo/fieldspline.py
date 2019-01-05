@@ -1,7 +1,7 @@
 "Create and interpolate a 2D spline."
 
 from numpy import *
-from _fieldspline import setPQ, interior, interpolate
+from ._fieldspline import setPQ, interior, interpolate
 
 def k(s, t):
     "basis function for the spline"
@@ -28,7 +28,7 @@ def make_spline(x, y, z):
 
     m = len(x)
     if len(y) != m or len(z) != m:
-        raise AssertionError, 'incompatible dimensions in make_spline'
+        raise AssertionError('incompatible dimensions in make_spline')
     n = m + 6
 
     # coeffs are solution x to ax = b where b is z + 6 zeros,

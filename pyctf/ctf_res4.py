@@ -3,8 +3,8 @@ import numpy as np
 
 # Various structs in a .res4 file
 
-RES41HDR = "MEG41RS"
-RES42HDR = "MEG42RS"
+RES41HDR = b"MEG41RS"
+RES42HDR = b"MEG42RS"
 
 # One of these at the beginning.
 
@@ -108,7 +108,7 @@ CoeffInfo = Struct(""">
 def nullstrip(s):
     """Truncate a string at the first zero byte, if any."""
 
-    i = s.find('\x00')
+    i = s.find(b'\x00')
     if i < 0:
         return s
     return s[:i]
@@ -131,10 +131,10 @@ class res4data:
 def read_res4_structs(res4name):
     """Low level .res4 file access."""
 
-    f = open(res4name)
+    f = open(res4name, 'rb')
     s = f.read(8)
     if s[:-1] != RES41HDR and s[:-1] != RES42HDR:
-        raise Exception, "invalid .res4 file"
+        raise RuntimeError("invalid .res4 file")
 
     gr = getstruct(f, GenRes)
     runDesc = nullstrip(f.read(gr[gr_rdlen]))
@@ -190,11 +190,11 @@ def read_res4_structs(res4name):
 # Write the structs in a res4data container to a file.
 
 def write_res4_structs(res4name, r):
-    f = open(res4name, "w")
-    f.write(RES42HDR + '\x00')
+    f = open(res4name, 'wb')
+    f.write(RES42HDR + b'\x00')
 
     putstruct(f, GenRes, r.genRes)
-    f.write(r.runDesc + '\x00') # gr_rdlen assumed to be correct
+    f.write(r.runDesc + b'\x00') # gr_rdlen assumed to be correct
 
     nf = len(r.filterInfo)
     putstruct(f, NumFilters, [nf])
@@ -228,7 +228,7 @@ def write_res4_structs(res4name, r):
 
 def fmtChanName(name):
     """Remove the -xxxx from a channel name."""
-    return name.split('-')[0]
+    return name.decode("utf-8").split('-')[0]
 
 # Read a .res4 file and format the info to be more usable.
 
@@ -264,8 +264,8 @@ def readRes4(res4name):
     r.numChannels = r.genRes[gr_numChannels]
     r.numSamples = r.genRes[gr_numSamples]
     M = r.numChannels
-    r.time = nullstrip(r.genRes[gr_time])
-    r.date = nullstrip(r.genRes[gr_date])
+    r.time = nullstrip(r.genRes[gr_time]).decode("utf-8")
+    r.date = nullstrip(r.genRes[gr_date]).decode("utf-8")
 
     # Format the channel names and create an index to the channel number.
 

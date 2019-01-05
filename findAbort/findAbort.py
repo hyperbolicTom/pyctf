@@ -40,11 +40,11 @@ ds = pyctf.dsopen(dsname)
 
 T = ds.getNumberOfTrials()
 if T > 1:
-    printerror("This dataset has more than one trial.")
+    printerror("This dataset has more than one trial.") # @@@ use last trial!
     sys.exit(1)
 
 ch = ds.getChannelIndex("SCLK01")
-d = ds.getDsRawData(0, ch)
+d = ds.getDsRawData(0, ch)                              # @@@ (T, ch)
 
 if d[-1] != 0.:
     printerror("This dataset does not appear to end with zero.")
@@ -63,4 +63,4 @@ Cannot continue.""")
 # Output the time of the last non-zero sample.
 
 t = ds.getTimePt(samp - 1)
-print t
+print(t)

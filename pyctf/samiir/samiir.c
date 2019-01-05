@@ -16,14 +16,20 @@ typedef struct {
 #define FILTER_TYPE_IIR 1
 #define FILTER_TYPE_FFT 2
 
+#if PY_MAJOR_VERSION >= 3
+static void free_filter(PyObject *filter)
+{
+    FILTER *f = (FILTER *)PyCapsule_GetPointer(filter, NULL);
+#else
 static void free_filter(void *filter)
 {
     FILTER *f = (FILTER *)filter;
+#endif
 
     if (f->type == FILTER_TYPE_FFT) {
-	free(f->gain);
+        free(f->gain);
     }
-    free(filter);
+    free(f);
 }
 
 static char Doc_mkiir[] =
@@ -42,7 +48,7 @@ static PyObject *mkiir_wrap(PyObject *self, PyObject *args)
     IIRSPEC *filter;
 
     if (!PyArg_ParseTuple(args, "ddd:mkiir", &lo, &hi, &srate)) {
-	return NULL;
+        return NULL;
     }
 
     handle = (FILTER *)malloc(sizeof(FILTER));
@@ -52,55 +58,59 @@ static PyObject *mkiir_wrap(PyObject *self, PyObject *args)
     filter->rate = srate;
 
     if (hi > 0. && lo > 0. && lo < hi) {
-	filter->type = BANDPASS;
-	filter->order = SIG_ORDER;
-	filter->fl = lo;
-	filter->fh = hi;
+        filter->type = BANDPASS;
+        filter->order = SIG_ORDER;
+        filter->fl = lo;
+        filter->fh = hi;
     } else if (hi > 0. && lo > 0. && lo > hi) {
-	filter->type = BANDREJECT;
-	filter->order = SIG_ORDER;
-	filter->fl = hi;
-	filter->fh = lo;
+        filter->type = BANDREJECT;
+        filter->order = SIG_ORDER;
+        filter->fl = hi;
+        filter->fh = lo;
     } else if (lo > 0. && hi == 0.) {
-	filter->type = HIGHPASS;
-	filter->order = 2 * SIG_ORDER;
-	filter->fl = lo;
-	filter->fh = srate / 2.;
+        filter->type = HIGHPASS;
+        filter->order = 2 * SIG_ORDER;
+        filter->fl = lo;
+        filter->fh = srate / 2.;
     } else if (lo == 0. && hi > 0.) {
-	filter->type = LOWPASS;
-	filter->order = 2 * SIG_ORDER;
-	filter->fl = 0;
-	filter->fh = hi;
+        filter->type = LOWPASS;
+        filter->order = 2 * SIG_ORDER;
+        filter->fl = 0;
+        filter->fh = hi;
     }
 
     // compute filter coefficients
     if (mkiir(filter) < 0) {
-	PyErr_SetString(PyExc_RuntimeError, "mkiir() failed");
-	free(handle);
-	return NULL;
+        PyErr_SetString(PyExc_RuntimeError, "mkiir() failed");
+        free(handle);
+        return NULL;
     }
 
     // compute effective bandwidth of data filter in steps of 1 milliHz
     for (freq = bwfreq = 0.; freq < srate / 4.; freq += 0.001) {
-	h1 = response(filter, srate, freq);
-	if (h1 > M_SQRT2) {
-	    PyErr_SetString(PyExc_RuntimeError, "mkiir() failed: IIR filter is unstable for this sample rate");
-	    free(handle);
-	    return NULL;
-	}
-	bwfreq += 0.001 * (h1 * h1);
+        h1 = response(filter, srate, freq);
+        if (h1 > M_SQRT2) {
+            PyErr_SetString(PyExc_RuntimeError, "mkiir() failed: IIR filter is unstable for this sample rate");
+            free(handle);
+            return NULL;
+        }
+        bwfreq += 0.001 * (h1 * h1);
     }
 
     // test filter for low gain
     gain = bwfreq / (hi - lo);
     if (gain < M_SQRT1_2) {
-	printf("nominal filter bandwidth=%f\n", bwfreq);
-	PyErr_SetString(PyExc_RuntimeError, "WARNING: IIR filter gain too low");
-	free(handle);
-	return NULL;
+        fprintf(stderr, "nominal filter bandwidth=%f\n", bwfreq);
+        PyErr_SetString(PyExc_RuntimeError, "IIR filter gain too low");
+        free(handle);
+        return NULL;
     }
 
+#if PY_MAJOR_VERSION >= 3
+    o = PyCapsule_New(handle, NULL, free_filter);
+#else
     o = PyCObject_FromVoidPtr(handle, free_filter);
+#endif
     return o;
 }
 
@@ -120,33 +130,37 @@ static PyObject *mkfft_wrap(PyObject *self, PyObject *args)
     double *filter;
 
     if (!PyArg_ParseTuple(args, "dddi:mkfft", &lo, &hi, &srate, &len)) {
-	return NULL;
+        return NULL;
     }
 
     handle = (FILTER *)malloc(sizeof(FILTER));
     handle->type = FILTER_TYPE_FFT;
     if ((filter = (double *)malloc(len * sizeof(double))) == NULL) {
-	PyErr_SetString(PyExc_RuntimeError, "malloc() failed");
-	return NULL;
+        PyErr_SetString(PyExc_RuntimeError, "malloc() failed");
+        return NULL;
     }
     handle->gain = filter;
     handle->n = len;
 
     if (hi > 0. && lo > 0. && lo < hi) {
-	type = BANDPASS;
+        type = BANDPASS;
     } else if (hi > 0. && lo > 0. && lo > hi) {
-	type = BANDREJECT;
-	t = lo;
-	lo = hi;
-	hi = t;
+        type = BANDREJECT;
+        t = lo;
+        lo = hi;
+        hi = t;
     } else if (lo > 0. && hi == 0.) {
-	type = HIGHPASS;
+        type = HIGHPASS;
     } else if (lo == 0. && hi > 0.) {
-	type = LOWPASS;
+        type = LOWPASS;
     }
     Butterworth(handle->gain, len, lo, hi, srate, type, MAXORDER, &bwfreq);
 
+#if PY_MAJOR_VERSION >= 3
+    o = PyCapsule_New(handle, NULL, free_filter);
+#else
     o = PyCObject_FromVoidPtr(handle, free_filter);
+#endif
     return o;
 }
 
@@ -164,38 +178,50 @@ static PyObject *dofilt_wrap(PyObject *self, PyObject *args)
     IIRSPEC *filter;
 
     if (!PyArg_ParseTuple(args, "OO:dofilt", &ao, &fo)) {
-	return NULL;
+        return NULL;
     }
 
+#if PY_MAJOR_VERSION >= 3
+    if (!PyCapsule_CheckExact(fo)) {
+#else
     if (!PyCObject_Check(fo)) {
-	PyErr_SetString(PyExc_TypeError, "second argument must be a filter object");
-	return NULL;
+#endif
+        PyErr_SetString(PyExc_TypeError, "second argument must be a filter object");
+        return NULL;
     }
+#if PY_MAJOR_VERSION >= 3
+    handle = (FILTER *)PyCapsule_GetPointer(fo, NULL);
+#else
     handle = (FILTER *)PyCObject_AsVoidPtr(fo);
+#endif
 
     a = (PyArrayObject *)PyArray_ContiguousFromAny(ao, NPY_DOUBLE, 1, 1);
     if (a == NULL) {
-	return NULL;
+        return NULL;
     }
     n = PyArray_DIM(a, 0);
 
     dim[0] = n;
     r = (PyArrayObject *)PyArray_SimpleNew(1, dim, NPY_DOUBLE);
     if (r == NULL) {
-	Py_DECREF(a);
-	return NULL;
+        Py_DECREF(a);
+        return NULL;
     }
 
     if (handle->type == FILTER_TYPE_IIR) {
-	filter = (IIRSPEC *)&handle->iirspec;
-	if (bdiir((double *)PyArray_DATA(a), (double *)PyArray_DATA(r), n, filter) < 0) {
-	    PyErr_SetString(PyExc_RuntimeError, "bdiir() failed");  // because it allocates memory,
-	    Py_DECREF(a);                                           // which it shouldn't
-	    Py_DECREF(r);
-	    return NULL;
-	}
+        filter = (IIRSPEC *)&handle->iirspec;
+        if (bdiir((double *)PyArray_DATA(a), (double *)PyArray_DATA(r), n, filter) < 0) {
+            PyErr_SetString(PyExc_RuntimeError, "bdiir() failed");  // because it allocates memory,
+            Py_DECREF(a);                                           // which it shouldn't
+            Py_DECREF(r);
+            return NULL;
+        }
     } else {
-	FFTfilter((double *)PyArray_DATA(a), (double *)PyArray_DATA(r), handle->gain, n);
+        // sanity check -- len must match filter
+        if (n != handle->n)
+            PyErr_SetString(PyExc_RuntimeError, "filter length mismatch");
+
+        FFTfilter((double *)PyArray_DATA(a), (double *)PyArray_DATA(r), handle->gain, n);
     }
 
     Py_DECREF(a);
@@ -217,18 +243,26 @@ static PyObject *getiir_wrap(PyObject *self, PyObject *args)
     IIRSPEC *filter;
 
     if (!PyArg_ParseTuple(args, "O:getiir", &fo)) {
-	return NULL;
+        return NULL;
     }
 
     errs = "argument must be a filter object from mkiir()";
+#if PY_MAJOR_VERSION >= 3
+    if (!PyCapsule_CheckExact(fo)) {
+#else
     if (!PyCObject_Check(fo)) {
-	PyErr_SetString(PyExc_TypeError, errs);
-	return NULL;
+#endif
+        PyErr_SetString(PyExc_TypeError, errs);
+        return NULL;
     }
+#if PY_MAJOR_VERSION >= 3
+    handle = (FILTER *)PyCapsule_GetPointer(fo, NULL);
+#else
     handle = (FILTER *)PyCObject_AsVoidPtr(fo);
+#endif
     if (handle->type != FILTER_TYPE_IIR) {
-	PyErr_SetString(PyExc_TypeError, errs);
-	return NULL;
+        PyErr_SetString(PyExc_TypeError, errs);
+        return NULL;
     }
     filter = &handle->iirspec;
 
@@ -237,12 +271,12 @@ static PyObject *getiir_wrap(PyObject *self, PyObject *args)
     dim[0] = filter->NC;
     a = (PyArrayObject *)PyArray_SimpleNew(1, dim, NPY_DOUBLE);
     if (a == NULL) {
-	return NULL;
+        return NULL;
     }
     b = (PyArrayObject *)PyArray_SimpleNew(1, dim, NPY_DOUBLE);
     if (b == NULL) {
-	Py_DECREF(a);
-	return NULL;
+        Py_DECREF(a);
+        return NULL;
     }
 
     // fill them in in reverse order
@@ -250,8 +284,8 @@ static PyObject *getiir_wrap(PyObject *self, PyObject *args)
     x = (double *)PyArray_DATA(a);
     y = (double *)PyArray_DATA(b);
     for (i = filter->NC - 1, j = 0; i >= 0; i--, j++) {
-	x[j] = filter->num[i];
-	y[j] = filter->den[i];
+        x[j] = filter->num[i];
+        y[j] = filter->den[i];
     }
 
     // return a pair of arrays
@@ -277,18 +311,26 @@ static PyObject *getfft_wrap(PyObject *self, PyObject *args)
     double *gain;
 
     if (!PyArg_ParseTuple(args, "O:getfft", &fo)) {
-	return NULL;
+        return NULL;
     }
 
     errs = "argument must be a filter object from mkfft()";
+#if PY_MAJOR_VERSION >= 3
+    if (!PyCapsule_CheckExact(fo)) {
+#else
     if (!PyCObject_Check(fo)) {
-	PyErr_SetString(PyExc_TypeError, errs);
-	return NULL;
+#endif
+        PyErr_SetString(PyExc_TypeError, errs);
+        return NULL;
     }
+#if PY_MAJOR_VERSION >= 3
+    handle = (FILTER *)PyCapsule_GetPointer(fo, NULL);
+#else
     handle = (FILTER *)PyCObject_AsVoidPtr(fo);
+#endif
     if (handle->type != FILTER_TYPE_FFT) {
-	PyErr_SetString(PyExc_TypeError, errs);
-	return NULL;
+        PyErr_SetString(PyExc_TypeError, errs);
+        return NULL;
     }
     gain = handle->gain;
 
@@ -297,20 +339,25 @@ static PyObject *getfft_wrap(PyObject *self, PyObject *args)
     dim[0] = handle->n;
     a = (PyArrayObject *)PyArray_SimpleNew(1, dim, NPY_DOUBLE);
     if (a == NULL) {
-	return NULL;
+        return NULL;
     }
 
     // fill it
 
     x = (double *)PyArray_DATA(a);
     for (i = 0; i < handle->n; i++) {
-	x[i] = gain[i];
+        x[i] = gain[i];
     }
 
     // return the array
 
     return PyArray_Return(a);
 }
+
+static char Doc_samiir[] =
+"Time-series filters. First call either mkfft() or mkiir() to create\n\
+an FFT-based filter or an IIR filter respectively, then use dofilt()\n\
+to filter a 1D array of data.";
 
 static PyMethodDef Methods[] = {
     { "mkiir", mkiir_wrap, METH_VARARGS, Doc_mkiir },
@@ -321,8 +368,37 @@ static PyMethodDef Methods[] = {
     { NULL, NULL, 0, NULL }
 };
 
-void initsamiir()
+#if PY_MAJOR_VERSION >= 3
+
+static struct PyModuleDef moduledef = {
+    PyModuleDef_HEAD_INIT,
+    "samiir",
+    Doc_samiir,
+    -1,
+    Methods,
+    NULL, NULL, NULL, NULL
+};
+
+PyMODINIT_FUNC PyInit_samiir(void)
 {
-    Py_InitModule("samiir", Methods);
+    PyObject *m;
+
+    m = PyModule_Create(&moduledef);
+    if (m == NULL) {
+        return NULL;
+    }
+
+    import_array();
+
+    return m;
+}
+
+#else
+
+PyMODINIT_FUNC initsamiir(void)
+{
+    Py_InitModule3("samiir", Methods, Doc_samiir);
     import_array();
 }
+
+#endif

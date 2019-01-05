@@ -7,58 +7,60 @@ from pyctf.thd_atr import afni_header_read
 from pyctf.fid import *
 from pyctf.util import *
 
-usage("""-m|c|b name
+usage("""[-m] name
 Return the interfiducial distances for name.
-If -b is used, name is an AFNI brik.
-If -m or -c is used, name is an MEG dataset.
-For -m, the .hdm file is examined (the output of localSpheres).
-For -c, the .hc file is examined (the head coil locations).""")
+If name is an AFNI brik, the tagset is examined.
+If name is an MEG dataset, the .hc file is examined (the head coil locations),
+if -m is used, the .hdm file is examined (the output of localSpheres).""")
 
 HDM = 1
 HC = 2
 BRIK = 3
+mflg = None
 type = None
 
-optlist, args = parseargs("mcb")
+optlist, args = parseargs("m")
 
 for opt, arg in optlist:
     if opt == '-m':
-        type = HDM
-    elif opt == '-c':
-        type = HC
-    elif opt == '-b':
-        type = BRIK
+        mflg = True
 
-if type == None or len(args) != 1:
+if len(args) != 1:
     printusage()
     sys.exit(1)
 
-filename = args[0]
+name = args[0]
+if name[-1] == '/':
+    name = name[:-1]    # remove trailing slash
+dirname = os.path.expanduser(os.path.dirname(name))
+filename = os.path.basename(name)
 
 # If the argument is a .ds directory, get the corresponding .hc or .hdm file.
-s = filename.split('.')
-ext = s[-1]
-if ext == 'ds' or ext == 'ds/':
-    base = s[0].split('/')[-1]
-    if type == HDM:
-        msg("using default.hdm\n")
-        filename += '/' + 'default.hdm'
-    elif type == HC:
-        msg("using %s.hc\n" % base)
-        filename += '/' + base + '.hc'
 
-# If it's a BRIK, read the header, otherwise just open the file.
-
-if type == BRIK:
-    h = afni_header_read(filename)
-    if not h.has_key('TAGSET_NUM'):
-        printerror("%s has no tags!" % filename)
-        sys.exit(1)
-else:
+base, ext = os.path.splitext(filename)
+if ext == '.ds':
+    if mflg:
+        s = "default.hdm"
+        type = HDM
+    else:
+        s = "%s.hc" % base
+        type = HC
+    msg("using %s\n" % s)
+    filename = os.path.join(dirname, filename, s)
     x = open(filename)
 
+# If it's not an MEG dataset, assume it's a BRIK and read the header.
+
+else:
+    filename = os.path.join(dirname, filename)
+    h = afni_header_read(filename)
+    if not h.get('TAGSET_NUM'):
+        printerror("%s has no tags!" % filename)
+        sys.exit(1)
+    type = BRIK
+
 def get_coord(f):
-    l = f.next()
+    l = next(f)
     return float(l.split()[2])
 
 # HC
@@ -70,11 +72,11 @@ def coord(f):
 
 # HDM
 def coord2(s):
-    return array(map(int, s.split()[-3:])) * .1
+    return array(list(map(int, s.split()[-3:]))) * .1
 
 # BRIK
 def coord3(s):
-    x = array(map(fuzz, tl)[0:3]) * .1
+    x = array(list(map(fuzz, tl)[0:3])) * .1
     # convert from RAI to PRI
     return array((-x[1], x[0], x[2]))
 
@@ -142,12 +144,12 @@ elif type == BRIK:
 def length(d):
     return hypot.reduce(d)
 
-print 'nasion: %.3f %.3f %.3f' % tuple(n)
-print 'left ear: %.3f %.3f %.3f' % tuple(l)
-print 'right ear: %.3f %.3f %.3f' % tuple(r)
-print 'left - right: %.3f cm' % length(l - r)
-print 'nasion - left: %.3f cm' % length(n - l)
-print 'nasion - right: %.3f cm' % length(n - r)
+print('nasion: %.3f %.3f %.3f' % tuple(n))
+print('left ear: %.3f %.3f %.3f' % tuple(l))
+print('right ear: %.3f %.3f %.3f' % tuple(r))
+print('left - right: %.3f cm' % length(l - r))
+print('nasion - left: %.3f cm' % length(n - l))
+print('nasion - right: %.3f cm' % length(n - r))
 
 if l[1] < 0:
     msg("Warning: left / right flip detected.\n")

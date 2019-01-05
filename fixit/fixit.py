@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#! /usr/bin/env python
 
 import os, sys
 from pyctf import dsopen
@@ -12,7 +12,7 @@ ntrial = ds.getNumberOfTrials()
 nsamp = ds.getNumberOfSamples()
 nch = ds.getNumberOfChannels()
 
-print ntrial
+print(ntrial)
 
 meg4name = ds.getDsFileNameExt(".meg4")
 size = os.stat(meg4name).st_size - 8
@@ -23,7 +23,8 @@ r = ctf.read_res4_structs(res4name)
 # Get ntrials from size of dataset:
 ntrial = size / (nsamp * 4 * nch)
 
-print 'new ntrial is', ntrial
+print('new ntrial is', ntrial)
+
 g = list(r.genRes)
 g[ctf.gr_numTrials] = ntrial
 r.genRes = g

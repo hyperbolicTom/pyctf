@@ -21,11 +21,7 @@ for dsname in dslist:
     coilPos = ds.dewar
     l.append((t, coilPos, ds.setname))
 
-def cmp(x, y):
-    if x[0] < y[0]:
-        return -1
-    return 1
-l.sort(cmp)
+l.sort(key = lambda x: x[0])
 
 coilTimes = [x[0] for x in l]
 coilPosList = np.array([x[1] for x in l])
@@ -101,8 +97,11 @@ position(n)
 while 1:
     print()
     print('Enter a list of positions (0-%d) to average: ' % (len(coilPosList) - 1), end = '')
-    l = sys.stdin.readline()
-    n = np.array(list(map(int, l.split())))
+    sys.stdout.flush()
+    l = sys.stdin.readline().split()
+    if len(l) == 0:
+        break
+    n = np.array(list(map(int, l)))
     position(n)
     movement(n[0], n[-1])
 

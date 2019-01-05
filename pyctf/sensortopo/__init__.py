@@ -1,1 +1,1 @@
-from sensortopo import *
+from .sensortopo import sensortopo

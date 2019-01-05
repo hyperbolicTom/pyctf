@@ -6,7 +6,7 @@ from numpy import fromfile
 from pyctf.thd_atr import afni_open, afni_header_read
 from pyctf.util import *
 
-usage("""[options] activebrik [controlbrik]
+usage("""[options] -b "lo hi" activebrik [controlbrik]
 
 Display a time-frequency plot of the data stored in the named AFNI brik.
 Normalization is done as follows: if this is a statistical brik (i.e., one
@@ -19,25 +19,29 @@ that using -n none. In either case, the plot is logarithmic unless you say
 -e, in which case it straight power (i.e., based on zero); use this if you
 want to emphasize power increases.
 
+The -b option is not optional. The TF brik will be averaged across the band,
+and the result plotted.
+
 Other options:
 
     -t title    The title for the plot. Defaults to the marker name(s).
 
-    -r "lo hi"  Upper and lower bounds for the color bar.
+    -r "lo hi"  Upper and lower bounds for the y axis.
 
     -s file     Save the plot in the named file. Extension defaults to .png.
 
-    -x "t0 t1"  Zoom to x interval (time).
+    -o file     Save the timeseries in the named file as text.
 """)
 
-optlist, args = parseargs("t:n:er:s:x:")
+optlist, args = parseargs("t:n:er:s:b:o:")
 
 titlestr = None
 norm = 'default'
 logscale = True
 rlo = None
+blo = None
 plotfile = None
-xint = None
+outfile = None
 
 for opt, arg in optlist:
     if opt == '-t':
@@ -54,17 +58,20 @@ for opt, arg in optlist:
             sys.exit(1)
         rlo = float(s[0])
         rhi = float(s[1])
-    elif opt == '-x':
+    elif opt == '-b':
         s = arg.split()
         if len(s) != 2:
-            printerror("-x needs two numbers in quotes")
+            printerror("-b needs two numbers in quotes")
             printusage()
             sys.exit(1)
-        xint = (float(s[0]), float(s[1]))
+        blo = float(s[0])
+        bhi = float(s[1])
     elif opt == '-s':
         plotfile = arg
+    elif opt == '-o':
+        outfile = arg
 
-if len(args) < 1:
+if len(args) < 1 or blo is None:
     printusage()
     sys.exit(1)
 
@@ -105,12 +112,18 @@ if len(args) == 2:
         printerror("brik parameters do not match")
         sys.exit(1)
 
+if blo > hi or blo < lo or bhi > hi or bhi < lo or blo > bhi:
+    printerror("band limits must be between %g and %g" % (lo, hi))
+    sys.exit(1)
+
 if titlestr is None:
     titlestr = marker
     if titlestr == "None":
         titlestr = brikname
     if dual:
         titlestr = "%s / %s" % (marker, l2[0])
+
+titlestr += " -- %g to %g Hz" % (blo, bhi)
 
 #def avg_over_time(s):
 #    """Average over time and return an array of the same size
@@ -145,6 +158,10 @@ elif 'default'.startswith(norm):
     if not logscale:
         s = exp(s)
 
+ylabel = 'Power'
+if logscale:
+    ylabel = 'log(Power)'
+
 figure()
 
 n = min(minimum.reduce(s))
@@ -159,31 +176,29 @@ if rlo is not None:
     n = rlo
     m = rhi
 
-from pyctf.sensortopo.tics import scale1
-
-nlevels = 40
-clevel = linspace(n, m, nlevels)
-ticks, mticks = scale1(clevel[0], clevel[-1])
+freq = linspace(lo, hi, s.shape[0])
 time = linspace(start, end, s.shape[1])
-fr = linspace(lo, hi, s.shape[0])
-contourf(time, fr, s, clevel, cmap = cm.jet)
-ax = gca()
-colorbar(format = '%.2g', ticks = ticks)
-ax.set_xlabel('Time (s)')
-ax.set_ylabel('Frequency (Hz)')
-nlevels = 7
-clevel = linspace(n, m, nlevels)
-contour(time, fr, s, clevel, colors = 'black')
-title(titlestr, x = 0, horizontalalignment = 'left', fontsize = 15)
-if xint is None:
-    ax.set_xlim(start, end)
-else:
-    ax.set_xlim(xint[0], xint[1])
-ax.set_ylim(lo, hi)
 
-#rlab = "range [%.3g..%.3g]" % (n, m)
-#text(time[-1], fr[-1] + (fr[1] - fr[0]), rlab, fontsize = 10,
-#     horizontalalignment = 'right', verticalalignment = 'bottom')
+i = freq.searchsorted(blo)
+j = freq.searchsorted(bhi)
+x = s[i:j+1].mean(axis = 0)
+
+if outfile is not None:
+    f = open(outfile, 'w')
+    for o in zip(time, x):
+        f.write("%g %g\n" % o)
+    f.close()
+    sys.exit()
+
+plot(time, x)
+
+ax = gca()
+title(titlestr, x = 0, horizontalalignment = 'left', fontsize = 15)
+ax.set_xlabel('Time (s)')
+ax.set_ylabel(ylabel)
+ax.set_xlim(start, end)
+if rlo is not None:
+    ax.set_ylim(rlo, rhi)
 
 if plotfile is None:
     show()

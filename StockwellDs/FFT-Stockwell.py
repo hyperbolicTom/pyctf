@@ -6,8 +6,8 @@ import sys, os, tempfile
 from pylab import *
 import pyctf
 from pyctf.util import *
-from pyctf.st.smt import calc_tapers, calcbw, mtst
-from pyctf.st import st
+from pyctf.st.smt import calc_tapers, calcbw, mtst, smt
+from pyctf.st import st, fft
 from pyctf.samiir import mkfft, mkiir, dofilt
 
 usage("""[options] -c channel ... [dataset]
@@ -266,6 +266,7 @@ def freq(f):
     return int(f * seglen / srate + .5)
 
 s = 0.
+f = 0.
 if not aflag:
     s = [0.] * nch
 
@@ -305,8 +306,10 @@ for tr, t in tlist:
                     s += st(d, freq(lo), freq(hi))
                 else:
                     s += abs(st(d, freq(lo), freq(hi)))**2
+                    f += abs(fft(d))**2
             else:
                 s += mtst(K, tapers, d, freq(lo), freq(hi))
+                f += smt(K, d, tapers)
         else:
             s[ch] += d
         n += 1
@@ -335,8 +338,10 @@ if aflag:
         s = abs(s)**2
     else:
         s /= n
+        f /= n
 else:
     d = 0.
+    e = 0.
     for ch in range(nch):
         if verbose:
             print(ds.getChannelName(idx[ch]), end = ' ')
@@ -346,14 +351,17 @@ else:
                 d += st(s[ch] / n, freq(lo), freq(hi))
             else:
                 d += abs(st(s[ch] / n, freq(lo), freq(hi)))**2
+                e += abs(fft(s[ch] / n))**2
         else:
             d += mtst(K, tapers, s[ch] / n, freq(lo), freq(hi))
+            e += smt(K, s[ch] / n, tapers)
     if verbose:
         print()
     if Pflag:
         s = abs(d)**2 / nch
     else:
         s = d / nch
+        f = e / nch
 
 print('bw =', calcbw(K, seglen, srate))
 
@@ -402,6 +410,7 @@ def plotst(y, titlestr):
 ##    if dispt0 is not None:
 ##        time = linspace(dispt0, dispt1, y.shape[1])
     fr = linspace(lo, hi, y.shape[0])
+    ref = True
     if ref:
         subplot(211)
     c = contourf(time, fr, y, clevel, cmap = cm.jet)
@@ -413,21 +422,25 @@ def plotst(y, titlestr):
         cax.set_xlim(dispt0, dispt1)
     cax.set_ylim(lo, hi)
     title(titlestr, fontsize = 15)
-    colorbar(format = '%.2g', ticks = ticks)
+#    colorbar(format = '%.2g', ticks = ticks)
     if ref:
         #from matplotlib.colorbar import make_axes
         newright = cax.get_position().x1
         subplot(212)
-        plot(time, r)
+        srate / f.shape[0]
+        n = freq(hi) - freq(lo)
+        fr = linspace(lo, hi, n)
+        plot(fr, (f[:n]))
         # ensure the x axis takes up the same amount of space
         ax = gca()
         p = ax.get_position()
         p.x1 = newright
         ax.set_position(p)
+        ax.set_xlim(lo, hi)
         # ensure the x axis has the same range
-        a = list(ax.axis())
-        a[0:2] = cax.axis()[0:2]
-        ax.axis(a)
+        #a = list(ax.axis())
+        #a[0:2] = cax.axis()[0:2]
+        #ax.axis(a)
 
 if len(mlist) == 0:
     caption = "%d trial%s" % (ntrials, 's'[0:ntrials > 1])
@@ -450,9 +463,9 @@ if donorm:
 
     # Optionally smooth (decaying exponential model).
 
-    freq = linspace(lo, hi, x.shape[0])
+    fs = linspace(lo, hi, x.shape[0])
     if smoothnorm:
-        x = x.max() * exp(-freq/20.)
+        x = x.max() * exp(-fs/20.)
 
 #    figure()
 #    plot(freq, x)
@@ -464,6 +477,8 @@ if donorm:
     x.shape = (x.shape[0], 1)
     x = repeat(x, s.shape[1], 1)
     s /= x
+
+    f = x
 
     caption += " SNR"
 
@@ -482,6 +497,7 @@ if matfile:
 
 if lflag:
     s = log(s)
+    f = log(f)
 
 figure()
 plotst(s, "%s; %s" % (caption, cnames))

@@ -1,7 +1,7 @@
 import sys
 import numpy as npy
-from sine_taper import sine_taper
-from st import st, fft
+from .sine_taper import sine_taper
+from .st import st, fft
 from math import sqrt
 
 def calcK(bw, N, srate):
@@ -23,7 +23,7 @@ def calcbw(K, N, srate):
 # Precompute the tapers.
 
 def calc_tapers(K, N):
-    return map(lambda k, N = N: sine_taper(k, N), npy.arange(K))
+    return list(map(lambda k, N = N: sine_taper(k, N), npy.arange(K)))
 
 # Multitaper Stockwell transform.
 

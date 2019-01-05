@@ -13,7 +13,7 @@ them in a useful format.
 
 With -m, the specified mark is extracted, otherwise all of them are. More
 than one mark may be specified, by listing them in quotes, like this:
-        -m 'm1 m2'
+    -m 'm1 m2'
 
 With -l, the marks are labeled in the output. Use this for debugging, but
 don't include it when you make the final output, which will be input to
@@ -53,19 +53,19 @@ As a final example, to recode marks from an optical sensor, use:
 __scriptname = os.path.basename(sys.argv[0])
 
 def printerror(s):
-        sys.stderr.write("%s: %s\n" % (__scriptname, s))
+    sys.stderr.write("%s: %s\n" % (__scriptname, s))
 
 def printusage():
-        sys.stderr.write("usage: %s %s\n" % (__scriptname, __usage))
+    sys.stderr.write("usage: %s %s\n" % (__scriptname, __usage))
 
 def parseargs(opt):
-        try:
-                optlist, args = getopt.getopt(sys.argv[1:], opt)
-        except Exception, msg:
-                printerror(msg)
-                printusage()
-                sys.exit(1)
-        return optlist, args
+    try:
+        optlist, args = getopt.getopt(sys.argv[1:], opt)
+    except Exception as msg:
+        printerror(msg)
+        printusage()
+        sys.exit(1)
+    return optlist, args
 
 optlist, args = parseargs("m:t:lc:q:")
 
@@ -77,29 +77,29 @@ query = None
 tcdict = {}     # indexed by trial yielding the name of a mark
 
 for opt, arg in optlist:
-        if opt == '-m':
-                marker = arg.split()
-        elif opt == '-t':
-                classid = int(arg)
-        elif opt == '-l':
-                labelit = 1
-        elif opt == '-q':
-                query = arg
-        elif opt == '-c':
-                classmark = arg.split()
+    if opt == '-m':
+        marker = arg.split()
+    elif opt == '-t':
+        classid = int(arg)
+    elif opt == '-l':
+        labelit = 1
+    elif opt == '-q':
+        query = arg
+    elif opt == '-c':
+        classmark = arg.split()
 
 if len(args) != 1:
-        printusage()
-        sys.exit(1)
+    printusage()
+    sys.exit(1)
 
 dsname = args[0]
 filename = os.path.join(dsname, 'MarkerFile.mrk')
 
 try:
-        f = open(filename)
+    f = open(filename)
 except:
-        printerror("error opening %s" % filename)
-        sys.exit(1)
+    printerror("error opening %s" % filename)
+    sys.exit(1)
 f.close()
 
 marks = []
@@ -107,29 +107,29 @@ marks = []
 # This processes the samples for a marker.
 
 def get_samples(f, name, num):
-        if name in classmark:
-                for x in xrange(num):
-                        l = f.next().split()
-                        trial = int(l[0])
-                        t = float(l[1])
-                        tcdict[trial] = name
-        elif marker == [] or name in marker:
-                for x in xrange(num):
-                        l = f.next().split()
-                        trial = int(l[0])
-                        t = float(l[1])
-                        marks.append((trial, t, name))
-        else:
-                # just skip them
-                for x in xrange(num):
-                        f.next()
+    if name in classmark:
+        for x in range(num):
+            l = f.readline().split()
+            trial = int(l[0])
+            t = float(l[1])
+            tcdict[trial] = name
+    elif marker == [] or name in marker:
+        for x in range(num):
+            l = f.readline().split()
+            trial = int(l[0])
+            t = float(l[1])
+            marks.append((trial, t, name))
+    else:
+        # just skip them
+        for x in range(num):
+            f.readline()
 
 # Pre-parse the marker file with this sed script.
 # It folds the line after a : up onto the same line.
 
-sedscript = r"""/:/{
+sedscript = b"""/:/{
 N
-s/\n/ /
+s/\\n/ /
 }
 /^$/d
 """
@@ -149,59 +149,56 @@ MARK = 2
 NUM = 3
 state = START
 
-for l in f:
-        s = l.split(':')
-        if state == START:
-                if s[0] == 'CLASSGROUPID':
-                        if classid == None or int(s[1]) == classid:
-                                state = MARK
-        elif state == MARK:
-                if s[0] == 'NAME':
-                        name = s[1].strip()
-                        state = NUM
-        elif state == NUM:
-                if s[0] == 'NUMBER OF SAMPLES':
-                        num = int(s[1])
-                        f.next()
-                        get_samples(f, name, num)
-                        state = START
+while True:
+    l = f.readline()
+    if len(l) == 0:
+        break
+    l = l.decode("utf-8")
+    s = l.split(':')
+    if state == START:
+        if s[0] == 'CLASSGROUPID':
+            if classid == None or int(s[1]) == classid:
+                state = MARK
+    elif state == MARK:
+        if s[0] == 'NAME':
+            name = s[1].strip()
+            state = NUM
+    elif state == NUM:
+        if s[0] == 'NUMBER OF SAMPLES':
+            num = int(s[1])
+            f.readline()
+            get_samples(f, name, num)
+            state = START
 
 # If -c was used, filter out the marks not in the given class(es).
 
 if classmark:
-        def inclass(m, c = classmark):
-                return tcdict.get(m[0]) in classmark
-        marks = filter(inclass, marks)
+    def inclass(m, c = classmark):
+        return tcdict.get(m[0]) in classmark
+    marks = filter(inclass, marks)
 
 # Sort the remaining marks by trial and time.
 
-def cmp(m1, m2):
-        if m1[0] != m2[0]:              # trial
-                return int(m1[0] - m2[0])
-        if m1[1] < m2[1]: return -1
-        if m1[1] > m2[1]: return 1
-        return 0
-
-marks.sort(cmp)
+marks.sort(key = lambda x: (x[0], x[1]))
 
 # Objects of this class hold one event.  We'll make an array of them
 # so that queries can reference the entire thing.
 
 class Event:
-        def __init__(self, mark):
-                trial, t, name = mark
-                self.trial = trial
-                self.t = t
-                self.name = name
+    def __init__(self, mark):
+        trial, t, name = mark
+        self.trial = trial
+        self.t = t
+        self.name = name
 
 # Number the marks, and create an event array.
 
-nmarks = map(None, range(len(marks)), marks)
-ev = map(Event, marks)
+nmarks = enumerate(marks)
+ev = list(map(Event, marks))
 
 if len(ev) == 0:
-        printerror("no marks found!")
-        sys.exit(1)
+    printerror("no marks found!")
+    sys.exit(1)
 
 # Index the start of each trial for faster searching.
 
@@ -209,84 +206,88 @@ trial_start = [0] * (ev[-1].trial + 1)
 t = -1
 i = 0
 for e in ev:
-        if e.trial != t:
-                t = e.trial
-                trial_start[t] = i
-        i += 1
+    if e.trial != t:
+        t = e.trial
+        trial_start[t] = i
+    i += 1
 
 # This is used to index the event list.
 
 def doidx(x):
-        if x < 0 or x >= len(ev):
-                raise 'evidx'
-        return x
+    if x < 0 or x >= len(ev):
+        raise ValueError('evidx')
+    return x
 
 # Helper function to determine if a time window around the current
 # event contains the specified mark.  The times are with respect to
 # the current event!  We don't cross trial boundaries, either.
 
 def inwindow(t0, t1, mark):
-        global n
+    global n
 
-        # Make sure the arguments are sane.
+    # Make sure the arguments are sane.
 
-        if t1 <= t0:
-                printerror("inwindow() times out of order")
-                sys.exit(1)
+    if t1 <= t0:
+        printerror("inwindow() times out of order")
+        sys.exit(1)
 
-        # Ignore instances of the specified mark.
+    # Ignore instances of the specified mark.
 
-        if ev[n].name == mark:
-                return 0
-
-        # Now get the range, relative to the current mark.
-
-        now = ev[n].t
-        start = now + t0
-        end = now + t1
-        trial = ev[n].trial
-
-        # Search for the mark in the given time window of this trial.
-
-        i = trial_start[trial]
-        while i < len(ev) and ev[i].t <= end and ev[i].trial == trial:
-                if ev[i].t >= start and ev[i].name == mark:
-                        return 1
-                i += 1
+    if ev[n].name == mark:
         return 0
+
+    # Now get the range, relative to the current mark.
+
+    now = ev[n].t
+    start = now + t0
+    end = now + t1
+    trial = ev[n].trial
+
+    # Search for the mark in the given time window of this trial.
+
+    i = trial_start[trial]
+    while i < len(ev) and ev[i].t <= end and ev[i].trial == trial:
+        if ev[i].t >= start and ev[i].name == mark:
+            return 1
+        i += 1
+    return 0
 
 # If a query was given, treat it as a python boolean expression and use it
 # to filter the marks.
 
 if query:
-        # Mangle the query slightly: if the user said "name[idx]" then
-        # rewrite it as "ev[doidx(idx)].name", for name, trial, and t.
+    # Mangle the query slightly: if the user said "name[idx]" then
+    # rewrite it as "ev[doidx(idx)].name", for name, trial, and t.
 
-        p = re.compile(r"(?P<var>name|trial|t)\[(?P<idx>[^\]]+)\]")
-        def rpl(m):
-                return "ev[doidx(%s)].%s" % (m.group('idx'), m.group('var'))
-        q = p.sub(rpl, query)
+    p = re.compile(r"(?P<var>name|trial|t)\[(?P<idx>[^\]]+)\]")
+    def rpl(m):
+        return "ev[doidx(%s)].%s" % (m.group('idx'), m.group('var'))
+    q = p.sub(rpl, query)
 
-        # Now filter the marks with the mangled query.
+    # Now filter the marks with the mangled query.
 
-        def fn(x, expr = q):
-                global n
-                (n, (trial, t, name)) = x
-                try:
-                        res = eval(expr)
-                except 'evidx':
-                        return 0
-                except:
-                        printerror('warning: query failed on %s' % repr(x))
-                        return 0
-                return res
-        nmarks = filter(fn, nmarks)
+    def fn(x, expr = q):
+        global n
+
+        (n, (trial, t, name)) = x
+        try:
+            res = eval(expr)
+        except ValueError as msg:
+            if str(msg) == 'evidx':
+                return 0
+            raise
+        except:
+            printerror('warning: query failed on %s' % repr(x))
+            return 0
+
+        return res
+    nmarks = filter(fn, nmarks)
 
 # Print out whatever is left.
 
 for (n, (trial, t, name)) in nmarks:
-        if labelit:
-                print(name, trial, t)
-        else:
-                print(trial, t)
+    if labelit:
+        print(name, trial, t)
+    else:
+        print(trial, t)
 

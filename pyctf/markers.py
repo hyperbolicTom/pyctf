@@ -3,9 +3,9 @@ from subprocess import Popen, PIPE
 
 # This sed script pre-parses the marker file and makes things a little easier.
 
-_sedscript = r"""/:/{
+_sedscript = """/:/{
 N
-s/\n/ /
+s/\\n/ /
 }
 /^$/d
 """
@@ -20,8 +20,8 @@ class markers:
     #def __setitem__(self, key, value):
     #    self.marks[key] = value
 
-    def has_key(self, key):
-        return self.marks.has_key(key)
+    def get(self, key):
+        return self.marks.get(key)
 
     def keys(self):
         return self.marks.keys()
@@ -39,7 +39,7 @@ class markers:
         # Preprocess the file.
 
         sedcmd = ['sed', '-f', '-', markerfilename]
-        p = Popen(sedcmd, stdin=PIPE, stdout=PIPE)
+        p = Popen(sedcmd, stdin = PIPE, stdout = PIPE, universal_newlines = True)
         (pr, pw) = p.stdout, p.stdin
         pw.write(_sedscript)
         pw.close()
@@ -64,7 +64,7 @@ class markers:
             elif state == NUM:
                 if s[0] == 'NUMBER OF SAMPLES':
                     num = int(s[1])
-                    f.next()
+                    next(f)
                     self._get_samples(f, name, num)
                     state = START
         pr.close()
@@ -73,9 +73,9 @@ class markers:
     def _get_samples(self, f, name, num):
         "Add all the samples for a marker to the marks dict."
         for x in range(num):
-            l = f.next().split()
+            l = next(f).split()
             trial = int(l[0])
             t = float(l[1])
-            if not self.marks.has_key(name):
+            if not self.marks.get(name):
                 self.marks[name] = []
             self.marks[name].append((trial, t))

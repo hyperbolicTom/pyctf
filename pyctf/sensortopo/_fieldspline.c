@@ -13,36 +13,36 @@ static char Doc_setPQ[] =
 
 static PyObject *setPQ_wrap(PyObject *self, PyObject *args)
 {
-	int i, n;
-	double x, *xp;
-	PyObject *xo;
-	PyArrayObject *xa;
+    int i, n;
+    double x, *xp;
+    PyObject *xo;
+    PyArrayObject *xa;
 
-	if (!PyArg_ParseTuple(args, "O", &xo)) {
-		return NULL;
-	}
+    if (!PyArg_ParseTuple(args, "O", &xo)) {
+        return NULL;
+    }
 
-	xa = (PyArrayObject *)PyArray_ContiguousFromAny(xo, NPY_DOUBLE, 1, 1);
-	if (xa == NULL || PyArray_NDIM(xa) != 1) {
-		goto fail;
-	}
+    xa = (PyArrayObject *)PyArray_ContiguousFromAny(xo, NPY_DOUBLE, 1, 1);
+    if (xa == NULL || PyArray_NDIM(xa) != 1) {
+        goto fail;
+    }
 
-	n = PyArray_DIM(xa, 0);
+    n = PyArray_DIM(xa, 0);
 
-	if (PQ) free(PQ);
-	PQ = (double *)malloc(sizeof(double) * n);
+    if (PQ) free(PQ);
+    PQ = (double *)malloc(sizeof(double) * n);
 
-	xp = (double *)PyArray_DATA(xa);
-	for (i = 0; i < n; i++) {
-		PQ[i] = *xp++;
-	}
+    xp = (double *)PyArray_DATA(xa);
+    for (i = 0; i < n; i++) {
+        PQ[i] = *xp++;
+    }
 
-	Py_DECREF(xa);
-	Py_INCREF(Py_None);
-	return Py_None;
+    Py_DECREF(xa);
+    Py_INCREF(Py_None);
+    return Py_None;
 fail:
-	Py_XDECREF(xa);
-	return NULL;
+    Py_XDECREF(xa);
+    return NULL;
 }
 
 static char Doc_interior[] =
@@ -51,46 +51,46 @@ defined by the X and Y vectors (last point must equal first point).";
 
 static PyObject *interior_wrap(PyObject *self, PyObject *args)
 {
-	int i, n;
-	double x, y;
-	PyObject *xo, *yo, *ro;
-	PyArrayObject *xa, *ya;
+    int i, n;
+    double x, y;
+    PyObject *xo, *yo, *ro;
+    PyArrayObject *xa, *ya;
 
-	if (!PyArg_ParseTuple(args, "ddOO", &x, &y, &xo, &yo)) {
-		return NULL;
-	}
+    if (!PyArg_ParseTuple(args, "ddOO", &x, &y, &xo, &yo)) {
+        return NULL;
+    }
 
-	xa = ya = NULL;
+    xa = ya = NULL;
 
-	xa = (PyArrayObject *)PyArray_ContiguousFromAny(xo, NPY_DOUBLE, 1, 1);
-	if (xa == NULL || PyArray_NDIM(xa) != 1) {
-		goto fail;
-	}
-	ya = (PyArrayObject *)PyArray_ContiguousFromAny(yo, NPY_DOUBLE, 1, 1);
-	if (ya == NULL || PyArray_NDIM(ya) != 1) {
-		goto fail;
-	}
+    xa = (PyArrayObject *)PyArray_ContiguousFromAny(xo, NPY_DOUBLE, 1, 1);
+    if (xa == NULL || PyArray_NDIM(xa) != 1) {
+        goto fail;
+    }
+    ya = (PyArrayObject *)PyArray_ContiguousFromAny(yo, NPY_DOUBLE, 1, 1);
+    if (ya == NULL || PyArray_NDIM(ya) != 1) {
+        goto fail;
+    }
 
-	n = PyArray_DIM(xa, 0);
-	if (PyArray_DIM(ya, 0) != n) {
-		goto fail;
-	}
+    n = PyArray_DIM(xa, 0);
+    if (PyArray_DIM(ya, 0) != n) {
+        goto fail;
+    }
 
-	i = interior(x, y, n, (double *)PyArray_DATA(xa), (double *)PyArray_DATA(ya));
+    i = interior(x, y, n, (double *)PyArray_DATA(xa), (double *)PyArray_DATA(ya));
 
-	Py_DECREF(xa);
-	Py_DECREF(ya);
-	if (i) {
-		ro = Py_True;
-	} else {
-		ro = Py_False;
-	}
-	Py_INCREF(ro);
-	return ro;
+    Py_DECREF(xa);
+    Py_DECREF(ya);
+    if (i) {
+        ro = Py_True;
+    } else {
+        ro = Py_False;
+    }
+    Py_INCREF(ro);
+    return ro;
 fail:
-	Py_XDECREF(xa);
-	Py_XDECREF(ya);
-	return NULL;
+    Py_XDECREF(xa);
+    Py_XDECREF(ya);
+    return NULL;
 }
 
 #define bMIN(x, y) (x < y ? x : y)
@@ -100,30 +100,29 @@ fail:
 
 int interior(double x, double y, int n, double *X, double *Y)
 {
-	int p1, p2, counter;
-	double xinters;
+    int p1, p2, counter;
+    double xinters;
 
-	/* Scan the boundary list. */
+    /* Scan the boundary list. */
 
-	p1 = 0;
-	p2 = 1;
-	counter = 0;
-	while (p2 < n) {
-		if (y >  bMIN(Y[p1], Y[p2]) &&
-		    y <= bMAX(Y[p1], Y[p2]) &&
-		    x <= bMAX(X[p1], X[p2]) &&
-		    Y[p1] != Y[p2]) {
-			xinters = (y - Y[p1]) * (X[p2] - X[p1]) /
-						(Y[p2] - Y[p1]) + X[p1];
-			if (X[p1] == X[p2] || x <= xinters) {
-				counter++;
-			}
-		}
-		p1++;
-		p2++;
-	}
+    p1 = 0;
+    p2 = 1;
+    counter = 0;
+    while (p2 < n) {
+        if (y >  bMIN(Y[p1], Y[p2]) &&
+            y <= bMAX(Y[p1], Y[p2]) &&
+            x <= bMAX(X[p1], X[p2]) &&
+            Y[p1] != Y[p2]) {
+            xinters = (y - Y[p1]) * (X[p2] - X[p1]) / (Y[p2] - Y[p1]) + X[p1];
+            if (X[p1] == X[p2] || x <= xinters) {
+                counter++;
+            }
+        }
+        p1++;
+        p2++;
+    }
 
-	return counter & 1;
+    return counter & 1;
 }
 
 static char Doc_interpolate[] =
@@ -132,87 +131,120 @@ the spline created by make_spline(), which must have been called.";
 
 static PyObject *interpolate_wrap(PyObject *self, PyObject *args)
 {
-	int n;
-	double x, y, v;
-	PyObject *xo, *yo;
-	PyArrayObject *xa, *ya;
+    int n;
+    double x, y, v;
+    PyObject *xo, *yo;
+    PyArrayObject *xa, *ya;
 
-	if (!PyArg_ParseTuple(args, "ddOO", &x, &y, &xo, &yo)) {
-		return NULL;
-	}
+    if (!PyArg_ParseTuple(args, "ddOO", &x, &y, &xo, &yo)) {
+        return NULL;
+    }
 
-	xa = ya = NULL;
+    xa = ya = NULL;
 
-	xa = (PyArrayObject *)PyArray_ContiguousFromAny(xo, NPY_DOUBLE, 1, 1);
-	if (xa == NULL || PyArray_NDIM(xa) != 1) {
-		goto fail;
-	}
-	ya = (PyArrayObject *)PyArray_ContiguousFromAny(yo, NPY_DOUBLE, 1, 1);
-	if (ya == NULL || PyArray_NDIM(ya) != 1) {
-		goto fail;
-	}
+    xa = (PyArrayObject *)PyArray_ContiguousFromAny(xo, NPY_DOUBLE, 1, 1);
+    if (xa == NULL || PyArray_NDIM(xa) != 1) {
+        goto fail;
+    }
+    ya = (PyArrayObject *)PyArray_ContiguousFromAny(yo, NPY_DOUBLE, 1, 1);
+    if (ya == NULL || PyArray_NDIM(ya) != 1) {
+        goto fail;
+    }
 
-	n = PyArray_DIM(xa, 0);
-	if (PyArray_DIM(ya, 0) != n) {
-		goto fail;
-	}
+    n = PyArray_DIM(xa, 0);
+    if (PyArray_DIM(ya, 0) != n) {
+        goto fail;
+    }
 
-	v = interpolate(x, y, (double *)PyArray_DATA(xa), (double *)PyArray_DATA(ya), n);
+    v = interpolate(x, y, (double *)PyArray_DATA(xa), (double *)PyArray_DATA(ya), n);
 
-	Py_DECREF(xa);
-	Py_DECREF(ya);
+    Py_DECREF(xa);
+    Py_DECREF(ya);
 
-	return Py_BuildValue("d", v);
+    return Py_BuildValue("d", v);
 fail:
-	Py_XDECREF(xa);
-	Py_XDECREF(ya);
-	return NULL;
+    Py_XDECREF(xa);
+    Py_XDECREF(ya);
+    return NULL;
 }
 
 /* Basis function for the spline. */
 
 static double k(double s, double t)
 {
-	double x;
+    double x;
 
-	x = s * s + t * t;
-	if (x < 1e-6) {
-		return 0.;
-	}
-//        return x * x * log10(x);
-	return x * log(x);
+    x = s * s + t * t;
+    if (x < 1e-6) {
+        return 0.;
+    }
+//    return x * x * log10(x);
+    return x * log(x);
 }
 
 /* Interpolate. */
 
 double interpolate(double x, double y, double *X, double *Y, int n)
 {
-	int i;
-	double u;
+    int i;
+    double u;
 
-	u = 0.;
-	for (i = 0; i < n; i++) {
-		u += PQ[i] * k(x - X[i], y - Y[i]);
-	}
-	u += PQ[n];
-	u += PQ[n+1] * x;
-	u += PQ[n+2] * y;
-	u += PQ[n+3] * x * x;
-	u += PQ[n+4] * x * y;
-	u += PQ[n+5] * y * y;
+    u = 0.;
+    for (i = 0; i < n; i++) {
+        u += PQ[i] * k(x - X[i], y - Y[i]);
+    }
+    u += PQ[n];
+    u += PQ[n+1] * x;
+    u += PQ[n+2] * y;
+    u += PQ[n+3] * x * x;
+    u += PQ[n+4] * x * y;
+    u += PQ[n+5] * y * y;
 
-	return u;
+    return u;
 }
 
+static char Doc_spline[] =
+"Functions in this module are used to create 2D spline\n\
+topographs of MEG data; see fieldspline.py and sensortopo.py.";
+
 static PyMethodDef Methods[] = {
-	{ "setPQ", setPQ_wrap, METH_VARARGS, Doc_setPQ },
-	{ "interior", interior_wrap, METH_VARARGS, Doc_interior },
-	{ "interpolate", interpolate_wrap, METH_VARARGS, Doc_interpolate },
-	{ NULL, NULL, 0, NULL }
+    { "setPQ", setPQ_wrap, METH_VARARGS, Doc_setPQ },
+    { "interior", interior_wrap, METH_VARARGS, Doc_interior },
+    { "interpolate", interpolate_wrap, METH_VARARGS, Doc_interpolate },
+    { NULL, NULL, 0, NULL }
 };
+
+#if PY_MAJOR_VERSION >= 3
+
+static struct PyModuleDef moduledef = {
+    PyModuleDef_HEAD_INIT,
+    "_fieldspline",
+    Doc_spline,
+    -1,
+    Methods,
+    NULL, NULL, NULL, NULL
+};
+
+PyMODINIT_FUNC PyInit__fieldspline(void)
+{
+    PyObject *m;
+
+    m = PyModule_Create(&moduledef);
+    if (m == NULL) {
+        return NULL;
+    }
+
+    import_array();
+
+    return m;
+}
+
+#else
 
 void init_fieldspline()
 {
-	Py_InitModule("_fieldspline", Methods);
-	import_array();
+    Py_InitModule3("_fieldspline", Methods, Doc_spline);
+    import_array();
 }
+
+#endif

@@ -10,7 +10,7 @@ def scale1(lo, hi, ticint = None):
     tic intervals is returned in mticint."""
 
     if ticint is None:
-	ticint = 5
+        ticint = 5
 
     lo = float(lo)
     hi = float(hi)
@@ -22,19 +22,19 @@ def scale1(lo, hi, ticint = None):
 
     a, b = magform((hi - lo) / ticint)
     if a < 1.41:    # sqrt(2)
-	x = 1
+        x = 1
     elif a < 3.16:  # sqrt(10)
-	x = 2
+        x = 2
     elif a < 7.07:  # sqrt(50)
-	x = 5
+        x = 5
     else:
-	x = 10
+        x = 10
     if b < 0:
-	sep = x * pow(10., b)
+        sep = x * pow(10., b)
     else:
-	sep = float(x * (10 ** b))
+        sep = float(x * (10 ** b))
     if x == 10:
-	x = 1
+        x = 1
 
     # The following guarantees that if zero is in the range, it will be
     # included as a tic.
@@ -49,12 +49,12 @@ def magform(x):
     Returns (a, b), where x = a * 10^b, a >= 1., and b is integral."""
 
     if x == 0:
-	return 0., 0
+        return 0., 0
     l = log10(abs(x))
     r = fmod(l, 1.)
     a, b = pow(10., r), int(l - r)
     if a < 1.:
-	a, b = a * 10., b - 1
+        a, b = a * 10., b - 1
     if x < 0.:
-	a = -a
+        a = -a
     return a, b

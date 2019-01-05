@@ -1,17 +1,17 @@
 import numpy
 import pyctf
-import fid
+from pyctf import fid
 
 # Continuous head localization channels.
 
 fids = ['Na', 'Le', 'Re']
 chans = {fids[0]: ['HLC0011', 'HLC0012', 'HLC0013'],
-	 fids[1]: ['HLC0021', 'HLC0022', 'HLC0023'],
-	 fids[2]: ['HLC0031', 'HLC0032', 'HLC0033']}
+         fids[1]: ['HLC0021', 'HLC0022', 'HLC0023'],
+         fids[2]: ['HLC0031', 'HLC0032', 'HLC0033']}
 
 def getHM(ds, t, chan):
     if chan not in fids:
-	raise Exception, "no such channel %s" % chan
+        raise KeyError("no such channel %s" % chan)
     i = fids.index(chan)
     o = ds.head[i]
     c = chans[chan]
@@ -21,9 +21,9 @@ def getHM(ds, t, chan):
 
     l = []
     for ch in c:
-	x = ds.getDsData(t, d[ch])
-	x.shape = (x.shape[0], 1)
-	l.append(x)
+        x = ds.getDsData(t, d[ch])
+        x.shape = (x.shape[0], 1)
+        l.append(x)
     d = numpy.hstack(l) * 100. # m -> cm
 
     # Transform to relative head coordinates.
@@ -51,4 +51,4 @@ def getHM(ds, t, chan):
 #        arrow = ""
 #        if b > .5:
 #            arrow = "<--"
-#        print t, chan, a, b, arrow
+#        print(t, chan, a, b, arrow)
