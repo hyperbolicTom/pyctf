@@ -224,11 +224,13 @@ class dsopen:
             C = _readcov(n)
         return C
 
-    def clist2idx(self, clist):
+    def clist2idx(self, clist, cls = ctf.TYPE_MEG):
         """Convert a list of channel names to indices. Allow prefixes."""
 
         nc = self.r.numChannels
-        sl = [(i, self.r.chanName[i]) for i in range(nc)]
+        chanName = self.r.chanName
+        chanType = self.r.chanType
+        sl = [(i, chanName[i]) for i in range(nc) if chanType[i] == cls]
         r = []
         for c in clist:
             n = len(c)

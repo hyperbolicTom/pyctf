@@ -42,7 +42,7 @@ to hi Hz, and if 0 < hi < lo, make a band-reject filter.";
 static PyObject *mkiir_wrap(PyObject *self, PyObject *args)
 {
     double lo, hi, srate;
-    double bwfreq, freq, h1, gain;
+    double bw, bwfreq, freq, h1, gain;
     PyObject *o;
     FILTER *handle;
     IIRSPEC *filter;
@@ -78,6 +78,7 @@ static PyObject *mkiir_wrap(PyObject *self, PyObject *args)
         filter->fl = 0;
         filter->fh = hi;
     }
+    bw = filter->fh - filter->fl;
 
     // compute filter coefficients
     if (mkiir(filter) < 0) {
@@ -98,7 +99,7 @@ static PyObject *mkiir_wrap(PyObject *self, PyObject *args)
     }
 
     // test filter for low gain
-    gain = bwfreq / (hi - lo);
+    gain = bwfreq / bw;
     if (gain < M_SQRT1_2) {
         fprintf(stderr, "nominal filter bandwidth=%f\n", bwfreq);
         PyErr_SetString(PyExc_RuntimeError, "IIR filter gain too low");
@@ -218,9 +219,12 @@ static PyObject *dofilt_wrap(PyObject *self, PyObject *args)
         }
     } else {
         // sanity check -- len must match filter
-        if (n != handle->n)
+        if (n != handle->n) {
             PyErr_SetString(PyExc_RuntimeError, "filter length mismatch");
-
+            Py_DECREF(a);
+            Py_DECREF(r);
+            return NULL;
+        }
         FFTfilter((double *)PyArray_DATA(a), (double *)PyArray_DATA(r), handle->gain, n);
     }
 

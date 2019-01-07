@@ -70,6 +70,7 @@ void FFTfilter(
         }
 
         // Set up the fftw plans.
+        fftw_set_timelimit(5);          // for large len
         p1 = fftw_plan_dft_1d(len, x, X, FFTW_FORWARD, FFTW_MEASURE);
         p2 = fftw_plan_dft_1d(len, X, x, FFTW_BACKWARD, FFTW_MEASURE);
 
