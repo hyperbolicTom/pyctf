@@ -7,7 +7,7 @@ import pyctf
 from pyctf.util import *
 
 usage("""-m mark [--mc color] [-b|--band "lo hi"] [-i] [-a <amplThres>]
-    [-d <derivThres>] [--dt <deadTime>] [-t <trial>] [--twin "t0 t1"] -c channel dataset
+    [-d <derivThres>] [--dt <deadTime>] [-t <trial>] [--tlim "t0 t1"] -c channel dataset
 
     This program scans the specified channel of a dataset and marks the
     samples where the specified thresholds are exceeded. If an existing
