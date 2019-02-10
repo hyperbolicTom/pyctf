@@ -1,50 +1,65 @@
 #! /usr/bin/env python
 
-# This is parsemarks version 2.1
+# This is parsemarks version 2.2
 
 from __future__ import print_function
 
 import sys, os.path, getopt, re
 
-__usage = """[-m marker...] [-l] [-c classmark...] [-q query] dataset
+__usage = """[-m marker...] [-s 'm1 m2'] [-l] [-c classmark...] [-q query] dataset
 
 Extract the marks from the marker file associated with dataset and print
-them in a useful format.
+them in a useful format. The output has 2 columns: trial and time, or 3
+when using -l: marker trial time.
 
-With -m, the specified mark is extracted, otherwise all of them are. More
-than one mark may be specified, by listing them in quotes, like this:
+With -m, the specified marker is extracted, otherwise all of them are. More
+than one marker may be specified, by listing them in quotes, like this:
     -m 'm1 m2'
 
-With -l, the marks are labeled in the output. Use this for debugging, but
-don't include it when you make the final output, which will be input to
-addMarker -p.
+With -s, the pair of specified markers are assumed to form a "segment",
+where m1 is the "start mark" of a segment and m2 is the "end mark". The
+output will have 3 columns: trial t1 t2, where t1 is the time of a start
+mark, and t2 is the time of the nearest end mark following that start mark.
+For example:
+    parsemarks -s 'onset offset' $ds > segfile
+The resulting file can be used directly by the sam_cov program to specify
+the (variable length) time-segments that go into the covariance.
 
-When -c is used, the marks are assumed to identify the class of a trial.
-Usually you will have one of these marks per trial (probably right at the
-start). In this case, only those marks with the given class are printed.
+With -l, the markers are labeled in the output. Use this for debugging, but
+don't include it when you create output which will be input to addMarker -p
+or sam_cov.
 
-When -q is used, the query is treated as a boolean expression; only marks
+When -c is used, the markers are assumed to identify the class of a trial.
+Usually you will have one of these per trial (probably right at the start).
+In this case, only those markers with the given class are printed.
+
+When -q is used, the query is treated as a boolean expression; only markers
 for which the expression is true are printed. The variables trial, t, name,
 and n may be used in the expression, where n is the event number, and the
 other variables have the expected meaning. In addition, if any of trial, t,
-or name are specified with an array index, it refers to a different event,
-rather than the current one. For example, name[n+1] is the name of the next
-event, and t[n] is the same as just t.
+or name are specified with an array index, it will refer to a different
+event, rather than the current one. For example, name[n+1] is the name of
+the marker for the next event, and t[n] is the same as just t.
 
 One common construction is the following:
     parsemarks -m 'stim resp' \\
         -q "name == 'resp' and name[n-1] == 'stim' and t < t[n-1] + .5" $ds
-which prints resp marks that are less than .5 sec after the stim. To make
+which prints resp markers that are less than .5 sec after the stim. To make
 this a little simpler, the "inwindow()" function is available:
     parsemarks -m 'stim resp' -q "inwindow(-.5, 0, 'stim')" $ds
 
-In detail, inwindow(t0, t1, mark) is true when 'mark' is in the window
-[t0, t1] relative to the current event. However, 'mark' itself is never
-considered, even if it is in the window. This means the example above
-is equivalent to:
+In detail, inwindow(t0, t1, marker) is true when 'marker' is in the window
+[t0, t1] relative to the current event. However, 'marker' itself is never
+considered, even if it is in the window. This means the example above is
+equivalent to:
     parsemarks -m 'stim resp' \\
         -q "name == 'resp' and inwindow(-.5, 0, 'stim')" $ds
 Remember that the window is relative to 'resp' here, not 'stim'.
+
+Note that -s 'm1 m2' is similar to:
+    parsemarks -m 'm1 m2' -q "name == m1 and name[n+1] == m2" $ds
+except that the output also includes the time of the second marker.
+If -q is used in conjunction with -s, both tests must pass.
 
 As a final example, to recode marks from an optical sensor, use:
     parsemarks -m 'bar cond' -q "inwindow(-.1, 0, 'cond')" $ds
@@ -67,13 +82,14 @@ def parseargs(opt):
         sys.exit(1)
     return optlist, args
 
-optlist, args = parseargs("m:t:lc:q:")
+optlist, args = parseargs("m:t:lc:q:s:")
 
 marker = []
 classid = None
 labelit = 0
 classmark = []
 query = None
+segmarks = []
 tcdict = {}     # indexed by trial yielding the name of a mark
 
 for opt, arg in optlist:
@@ -87,9 +103,18 @@ for opt, arg in optlist:
         query = arg
     elif opt == '-c':
         classmark = arg.split()
+    elif opt == '-s':
+        segmarks = arg.split()
 
 if len(args) != 1:
     printusage()
+    sys.exit(1)
+
+allmarks = False
+if len(marker) == 0 and len(segmarks) == 0:
+    allmarks = True
+if segmarks and len(segmarks) != 2:
+    printerror("must use two marker names with -s")
     sys.exit(1)
 
 dsname = args[0]
@@ -113,7 +138,7 @@ def get_samples(f, name, num):
             trial = int(l[0])
             t = float(l[1])
             tcdict[trial] = name
-    elif marker == [] or name in marker:
+    elif allmarks or name in marker or name in segmarks:
         for x in range(num):
             l = f.readline().split()
             trial = int(l[0])
@@ -157,7 +182,7 @@ while True:
     s = l.split(':')
     if state == START:
         if s[0] == 'CLASSGROUPID':
-            if classid == None or int(s[1]) == classid:
+            if classid is None or int(s[1]) == classid:
                 state = MARK
     elif state == MARK:
         if s[0] == 'NAME':
@@ -175,21 +200,18 @@ while True:
 if classmark:
     def inclass(m, c = classmark):
         return tcdict.get(m[0]) in classmark
-    marks = filter(inclass, marks)
+    marks = list(filter(inclass, marks))
 
 # Sort the remaining marks by trial and time.
 
 marks.sort(key = lambda x: (x[0], x[1]))
 
-# Objects of this class hold one event.  We'll make an array of them
+# Objects of this class hold one event. We'll make an array of them
 # so that queries can reference the entire thing.
 
 class Event:
     def __init__(self, mark):
-        trial, t, name = mark
-        self.trial = trial
-        self.t = t
-        self.name = name
+        self.trial, self.t, self.name = mark
 
 # Number the marks, and create an event array.
 
@@ -219,8 +241,8 @@ def doidx(x):
     return x
 
 # Helper function to determine if a time window around the current
-# event contains the specified mark.  The times are with respect to
-# the current event!  We don't cross trial boundaries, either.
+# event contains the specified mark. The times are with respect to
+# the current event! We don't cross trial boundaries, either.
 
 def inwindow(t0, t1, mark):
     global n
@@ -252,12 +274,44 @@ def inwindow(t0, t1, mark):
         i += 1
     return 0
 
-# If a query was given, treat it as a python boolean expression and use it
-# to filter the marks.
+# Helper function to determine if the current event begins a
+# segment as specified by -s. Don't cross trial boundaries.
+
+def issegment(smark, emark):
+    global n
+
+    # This event doesn't begin a segment if it isn't a start mark.
+
+    if ev[n].name != smark:
+        return 0
+
+    # Search the rest of the trial until we find the emark.
+
+    t = ev[n].trial
+    for i in range(n + 1, len(ev)):
+        if ev[i].trial != t:
+            printerror("warning: trial %d, no matching end mark for '%s' at %g" % (t, smark, ev[n].t))
+        if ev[i].name == emark:
+            # Stash the time of the end mark in the smark's event.
+            ev[n].t2 = ev[i].t
+            return 1
+
+    return 0
+
+# If a query was given, treat it as a boolean expression and use it
+# to filter the marks. Fake a query for -s.
+
+if segmarks:
+    squery = "issegment('%s', '%s')" % tuple(segmarks)
+    if query:
+        query = "(%s) and (%s)" % (query, squery)
+    else:
+        query = squery
 
 if query:
     # Mangle the query slightly: if the user said "name[idx]" then
-    # rewrite it as "ev[doidx(idx)].name", for name, trial, and t.
+    # rewrite it as "ev[doidx(idx)].name", for name, trial, and t,
+    # so the bounds are checked.
 
     p = re.compile(r"(?P<var>name|trial|t)\[(?P<idx>[^\]]+)\]")
     def rpl(m):
@@ -285,9 +339,18 @@ if query:
 
 # Print out whatever is left.
 
-for (n, (trial, t, name)) in nmarks:
-    if labelit:
-        print(name, trial, t)
-    else:
-        print(trial, t)
+if segmarks:
+    for (n, (trial, t, name)) in nmarks:
+        t2 = ev[n].t2
+        if labelit:
+            print(name, trial, t, t2)
+        else:
+            print(trial, t, t2)
+else:
+    for (n, (trial, t, name)) in nmarks:
+        if labelit:
+            print(name, trial, t)
+        else:
+            print(trial, t)
+
 
