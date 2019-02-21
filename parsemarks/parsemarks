@@ -343,7 +343,7 @@ if segmarks:
     for (n, (trial, t, name)) in nmarks:
         t2 = ev[n].t2
         if labelit:
-            print(name, trial, t, t2)
+            print(name, trial, t, t2, t2 - t)
         else:
             print(trial, t, t2)
 else:
