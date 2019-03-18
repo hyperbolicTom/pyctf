@@ -8,6 +8,6 @@ from .segments import get_segment_list, onlyTrials
 from .paramDict import paramDict
 # in case there's no display
 try:
-    from .sensortopo.sensortopo import sensortopo, cmap
+    from .sensortopo import sensortopo, cmap
 except:
     pass
