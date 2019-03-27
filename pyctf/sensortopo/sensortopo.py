@@ -1,7 +1,7 @@
 import sys, os
 from .fieldspline import make_spline, interpolate, interior
 from pylab import array, zeros, linspace, ma, contour, contourf, axis, gci, \
-    plot, scatter, text, sqrt
+    plot, scatter, text, sqrt, cm
 from .cmap import meg_cmap
 from .tics import scale1
 
@@ -100,7 +100,7 @@ class sensortopo:
                 mask[j, i] = interior(xx, yy, self.boundx, self.boundy)
         self.mask = ~mask
 
-    def plot(self, z, cmap = meg_cmap, zrange = 'zero', label = False, showsens = False, nocontour = False):
+    def plot(self, z, cmap = cm.coolwarm, zrange = 'zero', label = False, showsens = False, nocontour = False):
         """The array z of values to be plotted must be in the same
         order as the array returned by get_names(). zrange can be
         'auto', 'zero' which is auto but symmetric around 0, or
@@ -148,9 +148,8 @@ class sensortopo:
             scatter(self.x, self.y, s = 15, c = (0, 1, 0),
                 zorder = 2, marker = 'o', linewidth = .5)
 
-#        contourf(self.X, self.Y, Z, levels, cmap = cmap)
-#        contourf(self.X, self.Y, Z, levels, cmap = matplotlib.cm.hot)
-        contourf(self.X, self.Y, Z, levels)
+        contourf(self.X, self.Y, Z, levels, cmap = cmap)
+#        contourf(self.X, self.Y, Z, levels)
         im = gci() # save the ContourSet to return
         if not nocontour:
             contour(self.X, self.Y, Z, 10, colors = 'black')
