@@ -6,7 +6,7 @@ Base classes for matlab (TM) file stream reading
 
 import numpy as np
 
-import byteordercodes as boc
+from . import byteordercodes as boc
 
 def filldoc(func):
     ''' Decorator to put recurring doc elements into mio doc strings '''
@@ -347,7 +347,7 @@ class MatFileReader(MatStreamAgent):
 
         If variable_names is None, then get all variables in file
         '''
-        if isinstance(variable_names, basestring):
+        if isinstance(variable_names, str):
             variable_names = [variable_names]
         self.mat_stream.seek(0)
         mdict = self.file_header()
