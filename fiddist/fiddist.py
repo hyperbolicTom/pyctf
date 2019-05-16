@@ -76,7 +76,7 @@ def coord2(s):
 
 # BRIK
 def coord3(s):
-    x = array(list(map(fuzz, tl)[0:3])) * .1
+    x = array(list(map(fuzz, tl))[0:3]) * .1
     # convert from RAI to PRI
     return array((-x[1], x[0], x[2]))
 
