@@ -6,7 +6,7 @@ from __future__ import print_function
 
 import sys, os.path, getopt, re
 
-__usage = """[-m marker...] [-s 'm1 m2'] [-l] [-c classmark...] [-q query] dataset
+__usage = """[-m marker...] [-s 'm1 m2'] [-l] [-c classmark...] [-q query] [-e expr] dataset
 
 Extract the marks from the marker file associated with dataset and print
 them in a useful format. The output has 2 columns: trial and time, or 3
@@ -40,6 +40,14 @@ other variables have the expected meaning. In addition, if any of trial, t,
 or name are specified with an array index, it will refer to a different
 event, rather than the current one. For example, name[n+1] is the name of
 the marker for the next event, and t[n] is the same as just t.
+
+With -e, the final output may be modified by an arbitrary expression.
+This is useful for shifting the time of a mark; for example, when using
+an auditory stimulus one might wish to shift the time of the mark forward
+according to the speed-of-sound delay in the auditory tubing:
+    parsemarks -m stim -e "t += .01" $ds
+Be careful when using this option as it is possible to create marks that
+fall outside the trial boundaries.
 
 One common construction is the following:
     parsemarks -m 'stim resp' \\
@@ -82,13 +90,14 @@ def parseargs(opt):
         sys.exit(1)
     return optlist, args
 
-optlist, args = parseargs("m:t:lc:q:s:")
+optlist, args = parseargs("m:t:lc:q:s:e:")
 
 marker = []
 classid = None
 labelit = 0
 classmark = []
 query = None
+expr = None
 segmarks = []
 tcdict = {}     # indexed by trial yielding the name of a mark
 
@@ -101,6 +110,8 @@ for opt, arg in optlist:
         labelit = 1
     elif opt == '-q':
         query = arg
+    elif opt == '-e':
+        expr = arg
     elif opt == '-c':
         classmark = arg.split()
     elif opt == '-s':
@@ -328,13 +339,13 @@ if query:
             res = eval(expr)
         except ValueError as msg:
             if str(msg) == 'evidx':
-                return 0
+                return False
             raise
         except:
             printerror('warning: query failed on %s' % repr(x))
-            return 0
-
+            return False
         return res
+
     nmarks = filter(fn, nmarks)
 
 # Print out whatever is left.
@@ -342,12 +353,16 @@ if query:
 if segmarks:
     for (n, (trial, t, name)) in nmarks:
         t2 = ev[n].t2
+        if expr:
+            exec(expr)
         if labelit:
             print(name, trial, t, t2, t2 - t)
         else:
             print(trial, t, t2)
 else:
     for (n, (trial, t, name)) in nmarks:
+        if expr:
+            exec(expr)
         if labelit:
             print(name, trial, t)
         else:
