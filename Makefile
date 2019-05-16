@@ -12,4 +12,9 @@ install: all
 		$(MAKE) -C $$x $@ || exit ;\
 	done
 
+install-home: all
+	for x in $(targets) ; do \
+		env BINDIR=~/bin LIBDIR=~/lib $(MAKE) -e -C $$x install || exit ;\
+	done
+
 clean: clean-x
