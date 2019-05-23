@@ -8,14 +8,24 @@ import re, os.path, sys
 def afni_open(filename, which):
     name = os.path.splitext(filename)[0]
     try:
-        f = open("%s.%s" % (name, which))
+        f = open("%s.%s" % (name, which), 'rb')
     except IOError:
         try:
-            f = open("%s+orig.%s" % (name, which))
+            f = open("%s+orig.%s" % (name, which), 'rb')
         except IOError:
             print("can't open %s" % filename, file = sys.stderr)
             sys.exit(1)
     return f
+
+# Reads are in binary mode to combat binary garbage that doesn't decode
+# into utf-8. Such strings sometimes occur in .HEAD files. So we need to
+# convert bytes back into strings; using the latin-1 encoding does this.
+
+def bytes2str(l):
+    return l.decode('latin-1')
+
+def getline(f):
+    return bytes2str(f.readline())
 
 class scanner:
     def __init__(self):
@@ -37,7 +47,7 @@ def afni_header_read(filename):
     p3 = re.compile(r"count  *= (?P<count>.*)")
 
     d = {}
-    l = f.readline()
+    l = getline(f)
     while len(l) != 0:
         if search(p1, l):
             thd_type = search.group('type')
@@ -46,12 +56,12 @@ def afni_header_read(filename):
         if search(p3, l):
             thd_count = int(search.group('count'))
             d[thd_name] = _decode_block(thd_type, thd_count, f)
-        l = f.readline()
+        l = getline(f)
     return d
 
 def _decode_block(thd_type, thd_count, f):
     if thd_type == 'string-attribute':
-        s = f.read(thd_count + 1)
+        s = bytes2str(f.read(thd_count + 1))
         if s[0] != "'" or len(s) != thd_count + 1:
             raise RuntimeError("afni header string-attribute")
         s = s[1:].strip()
