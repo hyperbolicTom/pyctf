@@ -1,18 +1,8 @@
 import os
-from subprocess import Popen, PIPE
-
-# This sed script pre-parses the marker file and makes things a little easier.
-
-_sedscript = """/:/{
-N
-s/\\n/ /
-}
-/^$/d
-"""
 
 class markers:
     """Access to the markers of a CTF dataset. Each marker becomes a key
-    that returns the list of samples."""
+    that returns a list of (trial, time) pairs."""
 
     def __getitem__(self, key):
         return self.marks[key]
@@ -29,27 +19,18 @@ class markers:
     def __init__(self, dsname):
         self.marks = {}
 
-        markerfilename = dsname + '/MarkerFile.mrk'
+        markerfilename = os.path.join(dsname, 'MarkerFile.mrk')
         try:
             f = open(markerfilename)
         except:
             return
-        f.close()
 
-        # Preprocess the file.
-
-        sedcmd = ['sed', '-f', '-', markerfilename]
-        p = Popen(sedcmd, stdin = PIPE, stdout = PIPE, universal_newlines = True)
-        (pr, pw) = p.stdout, p.stdin
-        pw.write(_sedscript)
-        pw.close()
-        f = pr
-
-        # Look at each line.
+        # Parse the file. Look at each line.
 
         START = 1
         MARK = 2
         NUM = 3
+        LIST = 4
         state = START
 
         for l in f:
@@ -59,16 +40,17 @@ class markers:
                     state = MARK
             elif state == MARK:
                 if s[0] == 'NAME':
-                    name = s[1].strip()
+                    name = next(f).split()[0]
                     state = NUM
             elif state == NUM:
                 if s[0] == 'NUMBER OF SAMPLES':
-                    num = int(s[1])
+                    num = int(next(f).split()[0])
+                    state = LIST
+            elif state == LIST:
                     next(f)
                     self._get_samples(f, name, num)
                     state = START
-        pr.close()
-        os.wait()
+        f.close()
 
     def _get_samples(self, f, name, num):
         "Add all the samples for a marker to the marks dict."
