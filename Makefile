@@ -1,5 +1,11 @@
 include config/Makefile.config
 
+# Use "make install" to install into the directory specified in config/Makefile.config.
+# Use "make symlinks" to additionally create symbolic links in DESTBIN and DESTLIB.
+
+DESTBIN = $(HOME)/bin
+DESTLIB = $(HOME)/lib
+
 targets = pyctf parsemarks avghc StockwellDs filterDs projDs thresholdDetect fiddist
 
 all:
@@ -12,9 +18,14 @@ install: all
 		$(MAKE) -C $$x $@ || exit ;\
 	done
 
-install-home: all
-	for x in $(targets) ; do \
-		env BINDIR=~/bin LIBDIR=~/lib/pyctf $(MAKE) -e -C $$x install || exit ;\
+symlinks: install
+	mkdir -p $(DESTBIN)
+	mkdir -p $(DESTLIB)
+	@for x in $(BINDIR)/*.py $(BINDIR)/parsemarks $(BINDIR)/matlab ; do \
+		y=`basename $$x` ; \
+		echo ln -s -f $$x $(DESTBIN)/$$y ; \
+		ln -s -f $$x $(DESTBIN)/$$y ; \
 	done
+	ln -s -f $(LIBDIR) $(DESTLIB)
 
 clean: clean-x
