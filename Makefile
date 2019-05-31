@@ -1,6 +1,6 @@
 include config/Makefile.config
 
-targets = pyctf parsemarks avghc StockwellDs filterDs projDs thresholdDetect
+targets = pyctf parsemarks avghc StockwellDs filterDs projDs thresholdDetect fiddist
 
 all:
 	for x in $(targets) ; do \
