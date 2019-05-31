@@ -136,7 +136,6 @@ try:
 except:
     printerror("error opening %s" % filename)
     sys.exit(1)
-f.close()
 
 marks = []
 
@@ -145,66 +144,49 @@ marks = []
 def get_samples(f, name, num):
     if name in classmark:
         for x in range(num):
-            l = f.readline().split()
+            l = next(f).split()
             trial = int(l[0])
             t = float(l[1])
             tcdict[trial] = name
     elif allmarks or name in marker or name in segmarks:
         for x in range(num):
-            l = f.readline().split()
+            l = next(f).split()
             trial = int(l[0])
             t = float(l[1])
             marks.append((trial, t, name))
     else:
         # just skip them
         for x in range(num):
-            f.readline()
-
-# Pre-parse the marker file with this sed script.
-# It folds the line after a : up onto the same line.
-
-sedscript = b"""/:/{
-N
-s/\\n/ /
-}
-/^$/d
-"""
-
-from subprocess import Popen, PIPE
-
-sedcmd = ['sed', '-f', '-', filename]
-p = Popen(sedcmd, stdin = PIPE, stdout = PIPE)
-p.stdin.write(sedscript)
-p.stdin.close()
-f = p.stdout
+            next(f)
 
 # Look at each line.
 
 START = 1
 MARK = 2
 NUM = 3
+LIST = 4
 state = START
 
-while True:
-    l = f.readline()
-    if len(l) == 0:
-        break
-    l = l.decode("utf-8")
+for l in f:
     s = l.split(':')
     if state == START:
         if s[0] == 'CLASSGROUPID':
-            if classid is None or int(s[1]) == classid:
+            id = int(next(f).split()[0])
+            if classid is None or id == classid:
                 state = MARK
     elif state == MARK:
         if s[0] == 'NAME':
-            name = s[1].strip()
+            name = next(f).split()[0]
             state = NUM
     elif state == NUM:
         if s[0] == 'NUMBER OF SAMPLES':
-            num = int(s[1])
-            f.readline()
+            num = int(next(f).split()[0])
+            state = LIST
+    elif state == LIST:
+            next(f)
             get_samples(f, name, num)
             state = START
+f.close()
 
 # If -c was used, filter out the marks not in the given class(es).
 
